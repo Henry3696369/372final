@@ -76,6 +76,20 @@ void train_model(MODEL* model){
     init_weights(model->W2, H1*H2); init_weights(model->b2, H2);
     init_weights(model->W3, H2*CLASSES); init_weights(model->b3, CLASSES);
 
+
+    float* d_train_data;
+    float* d_train_label;
+    MODEL* d_model;
+    float* d_h1;
+    float* d_h2;
+    float* d_out;
+    float* d_h1a;
+    float* d_h2a;
+    float* d_outa;
+    float* d_delta1;
+    float* d_delta2;
+    float* d_delta3;
+
     // Memory Copy  from Host to Device
     size_t data_size = NUM_TRAIN * SIZE * sizeof(float);
     size_t label_size = NUM_TRAIN * CLASSES * sizeof(float);
@@ -96,104 +110,54 @@ void train_model(MODEL* model){
     cudaMalloc((void**)&d_delta2, BATCH *sizeof(float)*H2);
     cudaMalloc((void**)&d_delta3, BATCH *sizeof(float)*CLASSES);
 
-
+    float* d_loss;
+    cudaMalloc((void**)&d_loss, sizeof(float));
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
-        float total_loss = 0; // 注意：Batch 模式下 loss 计算建议单独处理或在 GPU 累加
+        float loss=0;
     
-        // n 现在每次跳 64，表示这一波处理 [n, n+63] 这 64 张图
         for (int n = 0; n < NUM_TRAIN; n += BATCH) { 
             int current_batch = (n + BATCH > NUM_TRAIN) ? (NUM_TRAIN - n) : BATCH;
             
-            // ---------- 1. Forward (Batch 版) ----------
-            // 每个 Kernel 同时启动 BATCH 个 Block，每个 Block 处理一张图
+            // ---------- Forward ----------
             forward_layer1_batch<<<current_batch, H1>>>(d_train_data, d_model, d_h1, d_h1a, n);
             forward_layer2_batch<<<current_batch, H2>>>(d_h1a, d_model, d_h2, d_h2a);
-            forward_out_batch<<<current_batch, CLASSES>>>(d_h2a, d_model, d_out, d_outa);
+            //I pass H2 not CLASSES for faster spped
+            forward_out_batch<<<current_batch, H2>>>(d_h2a, d_model, d_out, d_outa); 
 
-            // ---------- 2. Backward (Batch 版) ----------
-            // 计算 64 张图各自的 delta 误差
-            backward_out_batch<<<BATCH, CLASSES>>>(d_outa, d_train_label + n*CLASSES, d_delta3);
-            backward_layer2_batch<<<BATCH, H2>>>(d_delta3, d_model, d_h2a, d_delta2);
-            backward_layer1_batch<<<BATCH, H1>>>(d_delta2, d_model, d_h1a, d_delta1);
+            // ---------- loss ----------
+            cudaMemset(d_loss, 0, sizeof(float));
+            count_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, ,d_loss, n);
+            float h_loss_sum = 0;
+            cudaMemcpy(&h_loss_sum, d_loss, sizeof(float), cudaMemcpyDeviceToHost);
+            loss -= h_loss_sum;
+            // ---------- Backward ----------
 
-            // ---------- 3. Update (权重更新) ----------
-            // 更新权重时，我们需要把这 64 张图的梯度“合力”加到权重上
-            // 这里可以直接让一个 Kernel 处理整个权重的更新
-            update_W3_batch<<<H2, CLASSES>>>(d_delta3, d_h2a, d_model);
-            update_W2_batch<<<H1, H2>>>(d_delta2, d_h1a, d_model);
-            update_W1_batch<<<SIZE, H1>>>(d_delta1, d_train_data + n*SIZE, d_model);
-        }
-}
+            backward_out_batch<<<current_batch, CLASSES>>>(d_outa, d_train_label, d_delta3, n);
+            backward_layer2_batch<<<current_batch, H2>>>(d_delta3, d_model, d_h2a, d_delta2);
+            backward_layer1_batch<<<current_batch, H1>>>(d_delta2, d_model, d_h1a, d_delta1);
 
-    
-
-    for (int epoch=0; epoch<EPOCHS; epoch++) {
-        float loss=0;
-        for (int n=0; n<NUM_TRAIN; n++) {
-            // ---------- Forward ----------
-
-
-            float h1[H1], h1a[H1];
-            for (int j=0;j<H1;j++){
-                h1[j]=model->b1[j];
-                for (int i=0;i<SIZE;i++) h1[j]+=train_data[n][i]*model->W1[i*H1+j];
-                h1a[j]=relu(h1[j]);
-            }
-            float h2[H2], h2a[H2];
-            for (int j=0;j<H2;j++){
-                h2[j]=model->b2[j];
-                for (int i=0;i<H1;i++) h2[j]+=h1a[i]*model->W2[i*H2+j];
-                h2a[j]=relu(h2[j]);
-            }
-            float out[CLASSES], outa[CLASSES];
-            for (int k=0;k<CLASSES;k++){
-                out[k]=model->b3[k];
-                for (int j=0;j<H2;j++) out[k]+=h2a[j]*model->W3[j*CLASSES+k];
-            }
-            softmax(out,outa,CLASSES);
-
-            // ---------- Loss ----------
-            for (int k=0;k<CLASSES;k++)
-                loss -= train_label[n][k]*logf(outa[k]+1e-8f);
-
-            // ---------- Backprop ----------
-            float delta3[CLASSES];
-            for (int k=0;k<CLASSES;k++)
-                delta3[k] = train_label[n][k]-outa[k];
-
-            float delta2[H2];
-            for (int j=0;j<H2;j++){
-                float err=0;
-                for (int k=0;k<CLASSES;k++) err+=delta3[k]*model->W3[j*CLASSES+k];
-                delta2[j]=err*drelu(h2a[j]);
-            }
-
-            float delta1[H1];
-            for (int j=0;j<H1;j++){
-                float err=0;
-                for (int k=0;k<H2;k++) err+=delta2[k]*model->W2[j*H2+k];
-                delta1[j]=err*drelu(h1a[j]);
-            }
-
-            // ---------- Update ----------
-            for (int j=0;j<H2;j++)
-                for (int k=0;k<CLASSES;k++)
-                    model->W3[j*CLASSES+k]+=LR*delta3[k]*h2a[j];
-            for (int k=0;k<CLASSES;k++) model->b3[k]+=LR*delta3[k];
-
-            for (int j=0;j<H1;j++)
-                for (int k=0;k<H2;k++)
-                    model->W2[j*H2+k]+=LR*delta2[k]*h1a[j];
-            for (int k=0;k<H2;k++) model->b2[k]+=LR*delta2[k];
-
-            for (int i=0;i<SIZE;i++)
-                for (int j=0;j<H1;j++)
-                    model->W1[i*H1+j]+=LR*delta1[j]*train_data[n][i];
-            for (int j=0;j<H1;j++) model->b1[j]+=LR*delta1[j];
+            // ---------- Update ---------- (I use the mean of 64 samples to update)
+            update_W3_batch<<<H2, CLASSES>>>(d_delta3, d_h2a, d_model, current_batch);
+            update_W2_batch<<<H1, H2>>>(d_delta2, d_h1a, d_model, current_batch);
+            update_W1_batch<<<SIZE, H1>>>(d_delta1, d_train_data, d_model, current_batch, n);
         }
         printf("Epoch %d, Loss=%.4f\n", epoch, loss/NUM_TRAIN);
     }
+    cudaFree(d_train_data);
+    cudaFree(d_train_label);
+    cudaFree(d_model);
+    cudaFree(d_h1);
+    cudaFree(d_h1a);
+    cudaFree(d_h2);
+    cudaFree(d_h2a);
+    cudaFree(d_out);
+    cudaFree(d_outa);
+    cudaFree(d_delta1);
+    cudaFree(d_delta2);
+    cudaFree(d_delta3);
+    cudaFree(d_loss);
+
 }
 
 /* Save the trained model to a binary file
