@@ -147,6 +147,8 @@ void train_model(MODEL* model){
         }
         printf("Epoch %d, Loss=%.4f\n", epoch, loss/NUM_TRAIN);
     }
+
+    cudaMemcpy(model, d_model, model_size, cudaMemcpyDeviceToHost);
     cudaFree(d_train_data);
     cudaFree(d_train_label);
     cudaFree(d_model);
