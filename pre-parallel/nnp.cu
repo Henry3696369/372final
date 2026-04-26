@@ -19,9 +19,9 @@
 #include "loader.h"
 #include "nnp.h"
 #include "kernels.h"
-// #include <math.h>
-// #include <cuda.h>
-// #include "config.h"
+#include <math.h>
+#include <cuda.h>
+#include "config.h"
 
 
 /* Activation functions for relu layers
