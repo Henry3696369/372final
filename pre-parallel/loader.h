@@ -6,7 +6,7 @@
 */
 #ifndef LOADER_H
 #define LOADER_H
-
+#include "config.h"
 // Global arrays
 extern float train_data[NUM_TRAIN][SIZE];
 extern float train_label[NUM_TRAIN][CLASSES];   // one-hot

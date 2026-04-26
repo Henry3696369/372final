@@ -8,6 +8,8 @@
 #ifndef NNP_H
 #define NNP_H
 
+#include "config.h"
+
 // Model structure for neural network with two hidden layers
 typedef struct tagMODEL{
     float W1[SIZE*H1];

@@ -8,6 +8,9 @@
  *     __global__ void test_kernel(){}
  */
 
+#include "kernels.h"
+#include <cuda.h>
+#include <math.h>
 //---------- Forward ----------
  __global__ void forward_layer1_batch(float* d_train_data, MODEL* d_model, float* d_h1, float* d_h1a, int n) {
 

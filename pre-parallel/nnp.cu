@@ -16,13 +16,12 @@
 */
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
-#include <cuda.h>
-#include "config.h"
 #include "loader.h"
 #include "nnp.h"
 #include "kernels.h"
-#include <curand_kernel.h>
+// #include <math.h>
+// #include <cuda.h>
+// #include "config.h"
 
 
 /* Activation functions for relu layers
