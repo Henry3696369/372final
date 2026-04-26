@@ -43,6 +43,6 @@ __global__ void update_W1_batch(
         float* d_delta1, float* d_train_data, MODEL* d_model, int current_batch, int n);
 
 __global__ void count_batch_loss(
-        float* d_train_label, float* d_outa, float* d_loss, int n)
+        float* d_train_label, float* d_outa, float* d_loss, int n);
 
 #endif
