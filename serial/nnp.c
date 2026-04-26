@@ -137,7 +137,7 @@ void train_model(MODEL* model){
                     model->W1[i*H1+j]+=LR*delta1[j]*train_data[n][i];
             for (int j=0;j<H1;j++) model->b1[j]+=LR*delta1[j];
         }
-        printf("Epoch %d\n", epoch);
+        printf("Epoch %d, Loss=%.4f\n", epoch, loss/NUM_TRAIN);
     }
 }
 
