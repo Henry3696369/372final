@@ -22,6 +22,7 @@
 #include "loader.h"
 #include "nnp.h"
 #include "kernels.h"
+#include <curand_kernel.h>
 
 
 /* Activation functions for relu layers
@@ -75,10 +76,64 @@ void train_model(MODEL* model){
     init_weights(model->W2, H1*H2); init_weights(model->b2, H2);
     init_weights(model->W3, H2*CLASSES); init_weights(model->b3, CLASSES);
 
+    // Memory Copy  from Host to Device
+    size_t data_size = NUM_TRAIN * SIZE * sizeof(float);
+    size_t label_size = NUM_TRAIN * CLASSES * sizeof(float);
+    size_t model_size = sizeof(MODEL);
+    cudaMalloc((void**)&d_train_data, data_size);
+    cudaMemcpy(d_train_data, train_data, data_size, cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&d_train_label, label_size);
+    cudaMemcpy(d_train_label, train_label, label_size, cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&d_model, model_size);
+    cudaMemcpy(d_model, model, model_size, cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&d_h1, BATCH *sizeof(float)*H1);
+    cudaMalloc((void**)&d_h1a, BATCH *sizeof(float)*H1);
+    cudaMalloc((void**)&d_h2, BATCH *sizeof(float)*H2);
+    cudaMalloc((void**)&d_h2a, BATCH *sizeof(float)*H2);
+    cudaMalloc((void**)&d_out, BATCH *sizeof(float)*CLASSES);
+    cudaMalloc((void**)&d_outa, BATCH *sizeof(float)*CLASSES);
+    cudaMalloc((void**)&d_delta1, BATCH *sizeof(float)*H1);
+    cudaMalloc((void**)&d_delta2, BATCH *sizeof(float)*H2);
+    cudaMalloc((void**)&d_delta3, BATCH *sizeof(float)*CLASSES);
+
+
+
+    for (int epoch = 0; epoch < EPOCHS; epoch++) {
+        float total_loss = 0; // 注意：Batch 模式下 loss 计算建议单独处理或在 GPU 累加
+    
+        // n 现在每次跳 64，表示这一波处理 [n, n+63] 这 64 张图
+        for (int n = 0; n < NUM_TRAIN; n += BATCH) { 
+            int current_batch = (n + BATCH > NUM_TRAIN) ? (NUM_TRAIN - n) : BATCH;
+            
+            // ---------- 1. Forward (Batch 版) ----------
+            // 每个 Kernel 同时启动 BATCH 个 Block，每个 Block 处理一张图
+            forward_layer1_batch<<<current_batch, H1>>>(d_train_data, d_model, d_h1, d_h1a, n);
+            forward_layer2_batch<<<current_batch, H2>>>(d_h1a, d_model, d_h2, d_h2a);
+            forward_out_batch<<<current_batch, CLASSES>>>(d_h2a, d_model, d_out, d_outa);
+
+            // ---------- 2. Backward (Batch 版) ----------
+            // 计算 64 张图各自的 delta 误差
+            backward_out_batch<<<BATCH, CLASSES>>>(d_outa, d_train_label + n*CLASSES, d_delta3);
+            backward_layer2_batch<<<BATCH, H2>>>(d_delta3, d_model, d_h2a, d_delta2);
+            backward_layer1_batch<<<BATCH, H1>>>(d_delta2, d_model, d_h1a, d_delta1);
+
+            // ---------- 3. Update (权重更新) ----------
+            // 更新权重时，我们需要把这 64 张图的梯度“合力”加到权重上
+            // 这里可以直接让一个 Kernel 处理整个权重的更新
+            update_W3_batch<<<H2, CLASSES>>>(d_delta3, d_h2a, d_model);
+            update_W2_batch<<<H1, H2>>>(d_delta2, d_h1a, d_model);
+            update_W1_batch<<<SIZE, H1>>>(d_delta1, d_train_data + n*SIZE, d_model);
+        }
+}
+
+    
+
     for (int epoch=0; epoch<EPOCHS; epoch++) {
         float loss=0;
         for (int n=0; n<NUM_TRAIN; n++) {
             // ---------- Forward ----------
+
+
             float h1[H1], h1a[H1];
             for (int j=0;j<H1;j++){
                 h1[j]=model->b1[j];
