@@ -30,7 +30,9 @@
 * Returns:
 *   activated value based on ReLU function 
 */
-float relu(float x) { return x > 0 ? x : 0; }
+float relu(float x) { 
+    return x > 0 ? x : 0; 
+}
 
 /* Derivative of ReLU activation function
 * Arguments:
@@ -38,7 +40,9 @@ float relu(float x) { return x > 0 ? x : 0; }
 * Returns:
 *   derivative value
 */
-float drelu(float y) { return y > 0 ? 1 : 0; }
+float drelu(float y) { 
+    return y > 0 ? 1 : 0; 
+}
 
 /* Softmax activation function
 * Arguments:
