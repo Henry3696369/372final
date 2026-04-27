@@ -1,0 +1,12 @@
+Script started on Sun Apr 26 21:47:02 2026
+]0;hengluo@r1t01.darwin:~/372final/pre-parallel[?1034h[hengluo@r1t01 pre-parallel]$ srun nnp train
+Epoch 0, Loss=1.9991
+Epoch 1, Loss=0.7156
+Epoch 2, Loss=0.4433
+Epoch 3, Loss=0.3707
+Epoch 4, Loss=0.3345
+Trained model in 3 seconds
+]0;hengluo@r1t01.darwin:~/372final/pre-parallel[hengluo@r1t01 pre-parallel]$ exit
+exit
+
+Script done on Sun Apr 26 21:47:12 2026
