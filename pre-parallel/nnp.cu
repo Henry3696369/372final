@@ -130,19 +130,11 @@ void train_model(MODEL* model){
 
             // ---------- loss ----------
 
-            if (BATCH ==1 ){
-                float test_loss[CLASSES];
-                cudaMemcpy(test_loss, d_outa, sizeof(float)*CLASSES, cudaMemcpyDeviceToHost);
-                for (int i=0;i<CLASSES;i++){
-                    loss-= train_label[n][i]*logf(test_loss[i]+1e-8f);
-                }
-
-            }
-            // cudaMemset(d_loss, 0, sizeof(float));
-            // count_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, d_loss, n);
-            // float h_loss_sum = 0;
-            // cudaMemcpy(&h_loss_sum, d_loss, sizeof(float), cudaMemcpyDeviceToHost);
-            // loss -= h_loss_sum;
+            cudaMemset(d_loss, 0, sizeof(float));
+            count_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, d_loss, n);
+            float h_loss_sum = 0;
+            cudaMemcpy(&h_loss_sum, d_loss, sizeof(float), cudaMemcpyDeviceToHost);
+            loss -= h_loss_sum;
             // ---------- Backward ----------
 
             backward_out_batch<<<current_batch, CLASSES>>>(d_outa, d_train_label, d_delta3, n);
