@@ -44,5 +44,7 @@ __global__ void update_W1_batch(
 
 __global__ void count_batch_loss(
         float* d_train_label, float* d_outa, float* d_loss, int n);
+__global__ void count_one_batch_loss(
+        float* d_train_label, float* d_outa, float* d_loss, int n);
 
 #endif
