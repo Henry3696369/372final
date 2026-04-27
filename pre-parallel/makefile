@@ -4,7 +4,7 @@ CFLAGS=
 
 nnp:loader.o nnp.o main.o kernels.o
 	$(CC) $(CFLAGS) kernels.o nnp.o loader.o main.o -o nnp -lm
-loader.o: loader.h config.h loader.cc
+loader.o: loader.h config.h loader.cc nnp.h
 	$(CC) -c loader.cc $(CFLAGS) -o loader.o
 
 nnp.o: nnp.cu loader.h config.h nnp.h kernels.h
