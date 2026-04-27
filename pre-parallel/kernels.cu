@@ -256,3 +256,22 @@ __global__ void count_batch_loss(
 
     }
     }
+
+__global__ void count_one_batch_loss(
+        float* d_train_label, float* d_outa, float* d_loss, int n){
+
+    int class_idx = threadIdx.x; // 0 - CLASSES-1
+    float* start_label = d_train_label + n * CLASSES;
+
+    __shared__ float loss_array[CLASSES];
+    loss_array[class_idx] = start_label[class_idx] * logf(d_outa[class_idx]+1e-8f);
+    __syncthreads();
+    if (class_idx ==0){
+        float sum =0.0f;
+        for (int i =0; i<CLASSES;i++){
+            sum += loss_array[i];
+        }
+        *d_loss = sum;
+    }
+    }
+    

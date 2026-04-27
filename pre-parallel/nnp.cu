@@ -130,7 +130,11 @@ void train_model(MODEL* model){
 
             // ---------- loss ----------
             cudaMemset(d_loss, 0, sizeof(float));
-            count_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, d_loss, n);
+            if (BATCH == 1){
+                count_one_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, d_loss, n);
+            } else {
+                count_batch_loss<<<current_batch, CLASSES>>>(d_train_label, d_outa, d_loss, n);
+            }
             float h_loss_sum = 0;
             cudaMemcpy(&h_loss_sum, d_loss, sizeof(float), cudaMemcpyDeviceToHost);
             loss -= h_loss_sum;
