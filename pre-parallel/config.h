@@ -25,7 +25,7 @@
 #define H1    256     // hidden layer 1
 #define H2    128     // hidden layer 2
 #define EPOCHS 5    // number of training epochs
-#define BATCH  64   // mini-batch size
+#define BATCH  1   // mini-batch size
 
 // Training parameters
 #define LR     0.01f // learning rate
